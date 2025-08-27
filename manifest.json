@@ -5,7 +5,8 @@
   "description": "简洁实用的网页工具箱 - 提供页面信息查看和常用功能",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "scripting"
   ],
   "action": {
     "default_popup": "popup.html",
