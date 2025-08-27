@@ -1,363 +1,251 @@
-// popup.js - Chrome插件弹窗功能脚本
+// popup.js - 弹窗界面逻辑
 
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('🛠️ [网页工具箱] Popup loaded');
+console.log('🛠️ Popup script loaded');
+
+// DOM元素
+const elements = {
+    loading: document.getElementById('loading'),
+    pageInfo: document.getElementById('page-info'),
+    pageStats: document.getElementById('page-stats'),
+    tools: document.getElementById('tools'),
+    status: document.getElementById('status'),
     
-    // 获取当前活动标签页
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        
-        if (tab && tab.url) {
-            // 显示页面基本信息
-            displayPageInfo(tab);
-            
-            // 获取页面统计信息
-            await getPageStats(tab.id);
-            
-            // 隐藏加载动画，显示内容
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('page-info').style.display = 'block';
-            document.getElementById('page-stats').style.display = 'block';
-        } else {
-            throw new Error('无法获取当前标签页信息');
-        }
-    } catch (error) {
-        console.error('Error getting tab info:', error);
-        showError('无法获取页面信息，请刷新后重试');
-    }
+    // 页面信息元素
+    pageTitle: document.getElementById('page-title'),
+    pageUrl: document.getElementById('page-url'),
+    pageDomain: document.getElementById('page-domain'),
     
-    // 绑定工具按钮事件（即使出错也要绑定）
-    try {
-        bindToolEvents();
-    } catch (error) {
-        console.error('Error binding tool events:', error);
-    }
+    // 统计信息元素
+    imageCount: document.getElementById('image-count'),
+    linkCount: document.getElementById('link-count'),
+    scriptCount: document.getElementById('script-count'),
+    
+    // 工具按钮
+    scrollTop: document.getElementById('scroll-top'),
+    highlightLinks: document.getElementById('highlight-links'),
+    copyUrl: document.getElementById('copy-url'),
+    showImages: document.getElementById('show-images')
+};
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Popup DOM loaded');
+    initializePopup();
 });
 
-// 显示页面基本信息
-function displayPageInfo(tab) {
+// 初始化弹窗
+async function initializePopup() {
     try {
-        document.getElementById('page-title').textContent = tab.title || '无标题';
-        document.getElementById('page-url').textContent = tab.url || '未知';
+        // 显示加载状态
+        showLoading();
         
-        // 安全地解析URL
-        if (tab.url) {
-            try {
-                const url = new URL(tab.url);
-                document.getElementById('page-domain').textContent = url.hostname || '未知';
-                document.getElementById('page-protocol').textContent = url.protocol.replace(':', '') || '未知';
-            } catch (urlError) {
-                console.warn('URL parsing failed:', urlError);
-                // 处理特殊页面（chrome://、extension://等）
-                if (tab.url.startsWith('chrome://')) {
-                    document.getElementById('page-domain').textContent = 'chrome内部页面';
-                    document.getElementById('page-protocol').textContent = 'chrome';
-                } else if (tab.url.startsWith('chrome-extension://')) {
-                    document.getElementById('page-domain').textContent = '扩展页面';
-                    document.getElementById('page-protocol').textContent = 'extension';
-                } else {
-                    document.getElementById('page-domain').textContent = '未知';
-                    document.getElementById('page-protocol').textContent = '未知';
-                }
-            }
-        } else {
-            document.getElementById('page-domain').textContent = '未知';
-            document.getElementById('page-protocol').textContent = '未知';
-        }
-    } catch (error) {
-        console.error('Error displaying page info:', error);
-        // 设置默认值
-        document.getElementById('page-title').textContent = '获取失败';
-        document.getElementById('page-url').textContent = '获取失败';
-        document.getElementById('page-domain').textContent = '获取失败';
-        document.getElementById('page-protocol').textContent = '获取失败';
-    }
-}
-
-// 获取页面统计信息
-async function getPageStats(tabId) {
-    try {
-        // 获取当前标签页信息以检查是否可以注入脚本
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        
-        if (!tab || !isScriptableTab(tab.url)) {
-            // 对于不可注入脚本的页面，显示特殊信息
-            document.getElementById('image-count').textContent = '不支持';
-            document.getElementById('link-count').textContent = '不支持';
-            document.getElementById('script-count').textContent = '不支持';
+        // 获取当前活动标签页
+        const tabs = await getCurrentTab();
+        if (!tabs || !tabs[0]) {
+            showError('无法获取当前标签页');
             return;
         }
         
-        // 向content script发送消息获取页面统计
-        const response = await chrome.tabs.sendMessage(tabId, { action: 'getPageStats' });
+        const currentTab = tabs[0];
+        console.log('Current tab:', currentTab);
         
-        if (response && !response.error) {
-            document.getElementById('image-count').textContent = response.imageCount || 0;
-            document.getElementById('link-count').textContent = response.linkCount || 0;
-            document.getElementById('script-count').textContent = response.scriptCount || 0;
-        } else {
-            throw new Error(response?.error || 'No response from content script');
+        // 检查是否是支持的页面
+        if (!isSupportedUrl(currentTab.url)) {
+            showError('当前页面不支持该功能\n(chrome:// 页面或本地文件)');
+            return;
         }
+        
+        // 从当前标签页获取页面信息
+        await loadPageData(currentTab);
+        
+        // 设置工具按钮事件
+        setupToolEvents(currentTab.id);
+        
+        // 显示内容
+        showContent();
+        
     } catch (error) {
-        console.error('Error getting page stats:', error);
-        // 如果无法获取统计信息，显示默认值
-        document.getElementById('image-count').textContent = '无法获取';
-        document.getElementById('link-count').textContent = '无法获取';
-        document.getElementById('script-count').textContent = '无法获取';
+        console.error('Initialize error:', error);
+        showError('初始化失败: ' + error.message);
     }
 }
 
-// 检查标签页是否可以注入脚本
-function isScriptableTab(url) {
-    if (!url) return false;
-    
-    // Chrome内部页面和扩展页面不能注入content script
-    const nonScriptableUrls = [
-        'chrome://',
-        'chrome-extension://',
-        'chrome-search://',
-        'chrome-devtools://',
-        'moz-extension://',
-        'edge-extension://',
-        'about:',
-        'file://'
-    ];
-    
-    return !nonScriptableUrls.some(prefix => url.startsWith(prefix));
-}
-
-// 绑定工具按钮事件
-function bindToolEvents() {
-    // 回到顶部
-    document.getElementById('scroll-to-top').addEventListener('click', async () => {
-        try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            
-            if (!isScriptableTab(tab.url)) {
-                showNotification('此页面不支持该功能');
-                return;
-            }
-            
-            const response = await chrome.tabs.sendMessage(tab.id, { action: 'scrollToTop' });
-            if (response && response.success) {
-                showNotification('已回到顶部');
+// 获取当前标签页
+function getCurrentTab() {
+    return new Promise((resolve, reject) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
             } else {
-                showNotification('操作失败，请刷新页面后重试');
+                resolve(tabs);
             }
-        } catch (error) {
-            console.error('Scroll to top failed:', error);
-            showNotification('操作失败，请检查页面是否支持此功能');
-        }
-    });
-    
-    // 高亮所有链接
-    document.getElementById('highlight-links').addEventListener('click', async () => {
-        try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            
-            if (!isScriptableTab(tab.url)) {
-                showNotification('此页面不支持该功能');
-                return;
-            }
-            
-            const response = await chrome.tabs.sendMessage(tab.id, { action: 'highlightLinks' });
-            if (response && response.success) {
-                showNotification('已高亮所有链接');
-            } else {
-                showNotification('高亮失败，请刷新页面后重试');
-            }
-        } catch (error) {
-            console.error('Highlight links failed:', error);
-            showNotification('操作失败，请检查页面是否支持此功能');
-        }
-    });
-    
-    // 显示所有图片信息
-    document.getElementById('show-images').addEventListener('click', async () => {
-        try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            
-            if (!isScriptableTab(tab.url)) {
-                showNotification('此页面不支持该功能');
-                return;
-            }
-            
-            const response = await chrome.tabs.sendMessage(tab.id, { action: 'showImageInfo' });
-            if (response && response.images) {
-                showImageDialog(response.images);
-            } else {
-                showNotification('无法获取图片信息');
-            }
-        } catch (error) {
-            console.error('Show images failed:', error);
-            showNotification('操作失败，请检查页面是否支持此功能');
-        }
-    });
-    
-    // 复制当前URL
-    document.getElementById('copy-url').addEventListener('click', async () => {
-        try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            await navigator.clipboard.writeText(tab.url);
-            showNotification('URL已复制到剪贴板');
-        } catch (error) {
-            console.error('Failed to copy URL:', error);
-            // 降级方案
-            try {
-                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-                const textArea = document.createElement('textarea');
-                textArea.value = tab.url;
-                textArea.style.position = 'absolute';
-                textArea.style.left = '-9999px';
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                showNotification('URL已复制到剪贴板');
-            } catch (fallbackError) {
-                showNotification('复制失败，请手动复制URL');
-            }
-        }
-    });
-}
-
-// 显示通知
-function showNotification(message) {
-    // 创建临时通知元素
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-size: 12px;
-        z-index: 1000;
-        animation: fadeInOut 2s ease-in-out;
-    `;
-    notification.textContent = message;
-    
-    // 添加CSS动画
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes fadeInOut {
-            0%, 100% { opacity: 0; transform: translateY(-10px); }
-            20%, 80% { opacity: 1; transform: translateY(0); }
-        }
-    `;
-    document.head.appendChild(style);
-    document.body.appendChild(notification);
-    
-    // 2秒后移除
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
-        }
-        if (style.parentNode) {
-            style.parentNode.removeChild(style);
-        }
-    }, 2000);
-}
-
-// 显示图片信息对话框
-function showImageDialog(images) {
-    const dialog = document.createElement('div');
-    dialog.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 2000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    
-    const content = document.createElement('div');
-    content.style.cssText = `
-        background: white;
-        color: black;
-        padding: 20px;
-        border-radius: 8px;
-        max-width: 300px;
-        max-height: 300px;
-        overflow-y: auto;
-    `;
-    
-    // 安全地创建内容
-    const header = document.createElement('h3');
-    header.textContent = '页面图片信息';
-    content.appendChild(header);
-    
-    if (images.length === 0) {
-        const noImages = document.createElement('p');
-        noImages.textContent = '页面中没有找到图片';
-        content.appendChild(noImages);
-    } else {
-        const summary = document.createElement('p');
-        summary.textContent = `共找到 ${images.length} 张图片：`;
-        content.appendChild(summary);
-        
-        const list = document.createElement('ul');
-        images.forEach((img, index) => {
-            const listItem = document.createElement('li');
-            listItem.style.cssText = 'margin: 5px 0; font-size: 12px;';
-            
-            const description = document.createElement('div');
-            description.textContent = `${index + 1}. ${img.alt || '无描述'}`;
-            listItem.appendChild(description);
-            
-            const url = document.createElement('small');
-            url.style.color = '#666';
-            url.textContent = img.src.substring(0, 50) + '...';
-            listItem.appendChild(url);
-            
-            list.appendChild(listItem);
         });
-        content.appendChild(list);
+    });
+}
+
+// 检查URL是否支持
+function isSupportedUrl(url) {
+    if (!url) return false;
+    return url.startsWith('http://') || url.startsWith('https://');
+}
+
+// 加载页面数据
+async function loadPageData(tab) {
+    try {
+        // 基本页面信息（从tab对象获取）
+        elements.pageTitle.textContent = tab.title || '未知标题';
+        elements.pageUrl.textContent = tab.url || '未知URL';
+        
+        // 解析域名
+        try {
+            const urlObj = new URL(tab.url);
+            elements.pageDomain.textContent = urlObj.hostname;
+        } catch (e) {
+            elements.pageDomain.textContent = '解析失败';
+        }
+        
+        // 向content script请求页面统计信息
+        const stats = await sendMessageToTab(tab.id, { action: 'getPageStats' });
+        
+        if (stats && !stats.error) {
+            elements.imageCount.textContent = stats.images || '0';
+            elements.linkCount.textContent = stats.links || '0';
+            elements.scriptCount.textContent = stats.scripts || '0';
+        } else {
+            // 如果无法获取统计信息，显示默认值
+            elements.imageCount.textContent = '计算中...';
+            elements.linkCount.textContent = '计算中...';
+            elements.scriptCount.textContent = '计算中...';
+        }
+        
+    } catch (error) {
+        console.error('Load page data error:', error);
+        // 显示基本信息，统计信息显示错误状态
+        elements.imageCount.textContent = '获取失败';
+        elements.linkCount.textContent = '获取失败';
+        elements.scriptCount.textContent = '获取失败';
     }
+}
+
+// 向标签页发送消息
+function sendMessageToTab(tabId, message) {
+    return new Promise((resolve) => {
+        chrome.tabs.sendMessage(tabId, message, (response) => {
+            if (chrome.runtime.lastError) {
+                console.warn('Message send error:', chrome.runtime.lastError.message);
+                resolve({ error: chrome.runtime.lastError.message });
+            } else {
+                resolve(response || { error: 'No response' });
+            }
+        });
+    });
+}
+
+// 设置工具按钮事件
+function setupToolEvents(tabId) {
+    // 回到顶部
+    elements.scrollTop.addEventListener('click', async () => {
+        const result = await sendMessageToTab(tabId, { action: 'scrollToTop' });
+        showStatus(result.error ? '操作失败' : '已回到页面顶部', !result.error);
+    });
     
-    const closeButton = document.createElement('button');
-    closeButton.textContent = '关闭';
-    closeButton.style.cssText = 'margin-top: 10px; padding: 5px 10px;';
-    closeButton.addEventListener('click', () => dialog.remove());
-    content.appendChild(closeButton);
+    // 高亮链接
+    elements.highlightLinks.addEventListener('click', async () => {
+        const result = await sendMessageToTab(tabId, { action: 'highlightLinks' });
+        showStatus(result.error ? '操作失败' : '链接高亮已切换', !result.error);
+    });
     
-    dialog.appendChild(content);
-    document.body.appendChild(dialog);
-    
-    // 点击背景关闭
-    dialog.addEventListener('click', (e) => {
-        if (e.target === dialog) {
-            dialog.remove();
+    // 复制URL
+    elements.copyUrl.addEventListener('click', async () => {
+        try {
+            const tabs = await getCurrentTab();
+            if (tabs && tabs[0]) {
+                await navigator.clipboard.writeText(tabs[0].url);
+                showStatus('URL已复制到剪贴板', true);
+            }
+        } catch (error) {
+            console.error('Copy URL error:', error);
+            showStatus('复制失败', false);
         }
     });
     
-    // ESC键关闭
-    const handleEscape = (e) => {
-        if (e.key === 'Escape') {
-            dialog.remove();
-            document.removeEventListener('keydown', handleEscape);
+    // 显示图片信息
+    elements.showImages.addEventListener('click', async () => {
+        const result = await sendMessageToTab(tabId, { action: 'getImageInfo' });
+        if (result.error) {
+            showStatus('获取图片信息失败', false);
+        } else {
+            showImageInfo(result.images || []);
         }
-    };
-    document.addEventListener('keydown', handleEscape);
+    });
 }
 
-// 显示错误信息
-function showError(message) {
-    const loadingElement = document.getElementById('loading');
-    if (loadingElement) {
-        // 安全地设置错误信息
-        loadingElement.innerHTML = '';
-        
-        const errorDiv = document.createElement('div');
-        errorDiv.style.color = '#ff6b6b';
-        errorDiv.textContent = `❌ ${message}`;
-        
-        loadingElement.appendChild(errorDiv);
+// 显示图片信息
+function showImageInfo(images) {
+    if (!images || images.length === 0) {
+        showStatus('页面中没有找到图片', false);
+        return;
     }
+    
+    let info = `页面共有 ${images.length} 张图片:\n\n`;
+    
+    // 显示前10张图片信息
+    const displayCount = Math.min(images.length, 10);
+    for (let i = 0; i < displayCount; i++) {
+        const img = images[i];
+        info += `${i + 1}. ${img.src || '无源地址'}\n`;
+        if (img.width && img.height) {
+            info += `   尺寸: ${img.width} x ${img.height}\n`;
+        }
+        info += `   Alt: ${img.alt || '无描述'}\n\n`;
+    }
+    
+    if (images.length > 10) {
+        info += `... 还有 ${images.length - 10} 张图片`;
+    }
+    
+    alert(info);
 }
+
+// 显示加载状态
+function showLoading() {
+    elements.loading.style.display = 'block';
+    elements.pageInfo.style.display = 'none';
+    elements.pageStats.style.display = 'none';
+    elements.tools.style.display = 'none';
+    elements.status.style.display = 'none';
+}
+
+// 显示内容
+function showContent() {
+    elements.loading.style.display = 'none';
+    elements.pageInfo.style.display = 'block';
+    elements.pageStats.style.display = 'block';
+    elements.tools.style.display = 'block';
+}
+
+// 显示错误
+function showError(message) {
+    elements.loading.style.display = 'none';
+    elements.pageInfo.style.display = 'none';
+    elements.pageStats.style.display = 'none';
+    elements.tools.style.display = 'none';
+    
+    elements.status.textContent = message;
+    elements.status.className = 'status error';
+    elements.status.style.display = 'block';
+}
+
+// 显示状态消息
+function showStatus(message, isSuccess) {
+    elements.status.textContent = message;
+    elements.status.className = `status ${isSuccess ? 'success' : 'error'}`;
+    elements.status.style.display = 'block';
+    
+    // 3秒后隐藏
+    setTimeout(() => {
+        elements.status.style.display = 'none';
+    }, 3000);
+}
+
+console.log('🎉 Popup script initialized');

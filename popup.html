@@ -4,25 +4,19 @@
     <meta charset="utf-8">
     <style>
         body {
-            width: 350px;
-            min-height: 400px;
+            width: 320px;
+            min-height: 450px;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            position: fixed;
-            top: 0;
-            right: 0;
-            z-index: 10000;
-            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
-            border-radius: 0 0 0 10px;
         }
         
         .header {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 15px;
+            padding: 20px;
             text-align: center;
+            background: rgba(255, 255, 255, 0.1);
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
         }
         
@@ -36,20 +30,18 @@
             padding: 20px;
         }
         
-        .info-section {
+        .section {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 15px;
-            backdrop-filter: blur(10px);
         }
         
-        .info-section h3 {
-            margin: 0 0 10px 0;
+        .section h3 {
+            margin: 0 0 12px 0;
             font-size: 14px;
-            color: #e0e0e0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            color: #f0f0f0;
+            font-weight: 600;
         }
         
         .info-item {
@@ -60,7 +52,7 @@
         
         .info-label {
             font-weight: 600;
-            color: #f0f0f0;
+            color: #e0e0e0;
         }
         
         .info-value {
@@ -68,39 +60,30 @@
             word-break: break-all;
         }
         
-        .tools-section {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .tool-button {
+        .button {
             width: 100%;
-            padding: 10px;
-            margin: 5px 0;
+            padding: 12px;
+            margin: 6px 0;
             background: rgba(255, 255, 255, 0.2);
             border: none;
             border-radius: 6px;
             color: white;
             font-size: 13px;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         
-        .tool-button:hover {
+        .button:hover {
             background: rgba(255, 255, 255, 0.3);
             transform: translateY(-1px);
-        }
-        
-        .tool-button:active {
-            transform: translateY(0);
         }
         
         .loading {
             text-align: center;
             padding: 20px;
             color: #d0d0d0;
+            font-size: 13px;
         }
         
         .spinner {
@@ -117,6 +100,24 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 12px;
+            text-align: center;
+        }
+        
+        .status.success {
+            background: rgba(76, 175, 80, 0.3);
+            border: 1px solid rgba(76, 175, 80, 0.5);
+        }
+        
+        .status.error {
+            background: rgba(244, 67, 54, 0.3);
+            border: 1px solid rgba(244, 67, 54, 0.5);
+        }
     </style>
 </head>
 <body>
@@ -125,12 +126,14 @@
     </div>
     
     <div class="content">
+        <!-- 加载状态 -->
         <div id="loading" class="loading">
             <div class="spinner"></div>
             正在加载页面信息...
         </div>
         
-        <div id="page-info" class="info-section" style="display: none;">
+        <!-- 页面信息 -->
+        <div id="page-info" class="section" style="display: none;">
             <h3>📄 页面信息</h3>
             <div class="info-item">
                 <span class="info-label">标题：</span>
@@ -144,35 +147,36 @@
                 <span class="info-label">域名：</span>
                 <span class="info-value" id="page-domain">-</span>
             </div>
-            <div class="info-item">
-                <span class="info-label">协议：</span>
-                <span class="info-value" id="page-protocol">-</span>
-            </div>
         </div>
         
-        <div id="page-stats" class="info-section" style="display: none;">
+        <!-- 页面统计 -->
+        <div id="page-stats" class="section" style="display: none;">
             <h3>📊 页面统计</h3>
             <div class="info-item">
-                <span class="info-label">图片数量：</span>
+                <span class="info-label">图片：</span>
                 <span class="info-value" id="image-count">-</span>
             </div>
             <div class="info-item">
-                <span class="info-label">链接数量：</span>
+                <span class="info-label">链接：</span>
                 <span class="info-value" id="link-count">-</span>
             </div>
             <div class="info-item">
-                <span class="info-label">脚本数量：</span>
+                <span class="info-label">脚本：</span>
                 <span class="info-value" id="script-count">-</span>
             </div>
         </div>
         
-        <div class="tools-section">
+        <!-- 实用工具 -->
+        <div id="tools" class="section" style="display: none;">
             <h3>🔧 实用工具</h3>
-            <button class="tool-button" id="scroll-to-top">回到顶部</button>
-            <button class="tool-button" id="highlight-links">高亮所有链接</button>
-            <button class="tool-button" id="show-images">显示所有图片信息</button>
-            <button class="tool-button" id="copy-url">复制当前URL</button>
+            <button class="button" id="scroll-top">回到页面顶部</button>
+            <button class="button" id="highlight-links">高亮所有链接</button>
+            <button class="button" id="copy-url">复制当前URL</button>
+            <button class="button" id="show-images">显示图片信息</button>
         </div>
+        
+        <!-- 状态提示 -->
+        <div id="status" style="display: none;"></div>
     </div>
     
     <script src="popup.js"></script>

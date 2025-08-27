@@ -1,14 +1,11 @@
 {
   "manifest_version": 3,
   "name": "网页工具箱",
-  "version": "1.0",
-  "description": "一个实用的网页工具箱，提供网页信息查看和实用功能",
+  "version": "2.0",
+  "description": "简洁实用的网页工具箱 - 提供页面信息查看和常用功能",
   "permissions": [
     "activeTab",
-    "storage",
-    "contextMenus",
-    "notifications",
-    "alarms"
+    "storage"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -20,13 +17,10 @@
       "128": "icons/icon128.png"
     }
   },
-  "background": {
-    "service_worker": "background.js"
-  },
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js", "content-sidebar.js"],
+      "js": ["content.js"],
       "run_at": "document_end"
     }
   ],
@@ -35,8 +29,5 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  },
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }
