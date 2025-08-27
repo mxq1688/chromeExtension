@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            width: 350px;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .sidebar-container {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 350px;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 2147483647;
+            transition: right 0.3s ease;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
+            overflow-y: auto;
+        }
+        
+        .sidebar-container.active {
+            right: 0;
+        }
+        
+        .sidebar-toggle {
+            position: fixed;
+            top: 50%;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 2147483648;
+            box-shadow: -3px 0 10px rgba(0, 0, 0, 0.3);
+            transform: translateY(-50%);
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-toggle:hover {
+            transform: translateY(-50%) scale(1.1);
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s ease;
+        }
+        
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .info-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .info-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #e0e0e0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .info-item {
+            margin: 8px 0;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #f0f0f0;
+        }
+        
+        .info-value {
+            color: #d0d0d0;
+            word-break: break-all;
+        }
+        
+        .tools-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .tool-button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .tool-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        
+        .tool-button:active {
+            transform: translateY(0);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #d0d0d0;
+        }
+        
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 2px solid white;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- 切换按钮 -->
+    <button class="sidebar-toggle" id="sidebarToggle">🛠️</button>
+    
+    <!-- 侧边栏容器 -->
+    <div class="sidebar-container" id="sidebarContainer">
+        <div class="header">
+            <button class="close-btn" id="closeSidebar">×</button>
+            <h1>🛠️ 网页工具箱</h1>
+        </div>
+        
+        <div class="content">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                正在加载页面信息...
+            </div>
+            
+            <div id="page-info" class="info-section" style="display: none;">
+                <h3>📄 页面信息</h3>
+                <div class="info-item">
+                    <span class="info-label">标题：</span>
+                    <span class="info-value" id="page-title">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">URL：</span>
+                    <span class="info-value" id="page-url">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">域名：</span>
+                    <span class="info-value" id="page-domain">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">协议：</span>
+                    <span class="info-value" id="page-protocol">-</span>
+                </div>
+            </div>
+            
+            <div id="page-stats" class="info-section" style="display: none;">
+                <h3>📊 页面统计</h3>
+                <div class="info-item">
+                    <span class="info-label">图片数量：</span>
+                    <span class="info-value" id="image-count">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">链接数量：</span>
+                    <span class="info-value" id="link-count">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">脚本数量：</span>
+                    <span class="info-value" id="script-count">-</span>
+                </div>
+            </div>
+            
+            <div class="tools-section">
+                <h3>🔧 实用工具</h3>
+                <button class="tool-button" id="scroll-to-top">回到顶部</button>
+                <button class="tool-button" id="highlight-links">高亮所有链接</button>
+                <button class="tool-button" id="show-images">显示所有图片信息</button>
+                <button class="tool-button" id="copy-url">复制当前URL</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="sidebar.js"></script>
+</body>
+</html>

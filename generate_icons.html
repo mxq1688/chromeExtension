@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Recording Icons</title>
+</head>
+<body>
+    <canvas id="canvas" style="border: 1px solid #ccc;"></canvas>
+    <div id="downloads"></div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const downloads = document.getElementById('downloads');
+
+        function drawMicrophoneIcon(size, strokeWidth) {
+            canvas.width = size;
+            canvas.height = size;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+            
+            // Set up drawing style
+            ctx.strokeStyle = '#2563eb';
+            ctx.fillStyle = '#3b82f6';
+            ctx.lineWidth = strokeWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            const center = size / 2;
+            const micWidth = size * 0.25;
+            const micHeight = size * 0.4;
+            const micTop = size * 0.15;
+            
+            // Draw microphone capsule
+            ctx.beginPath();
+            ctx.roundRect(center - micWidth/2, micTop, micWidth, micHeight, micWidth/2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Draw microphone stand
+            ctx.beginPath();
+            ctx.moveTo(center, micTop + micHeight);
+            ctx.lineTo(center, size * 0.75);
+            ctx.stroke();
+            
+            // Draw base
+            ctx.beginPath();
+            ctx.moveTo(center - size * 0.15, size * 0.75);
+            ctx.lineTo(center + size * 0.15, size * 0.75);
+            ctx.stroke();
+            
+            // Draw sound waves
+            const waveOffset = size * 0.1;
+            ctx.strokeStyle = '#60a5fa';
+            ctx.lineWidth = strokeWidth * 0.7;
+            
+            // First wave
+            ctx.beginPath();
+            ctx.arc(center, center, size * 0.35, -Math.PI/3, -Math.PI/6, false);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(center, center, size * 0.35, Math.PI/6, Math.PI/3, false);
+            ctx.stroke();
+            
+            // Second wave
+            ctx.beginPath();
+            ctx.arc(center, center, size * 0.45, -Math.PI/4, -Math.PI/8, false);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(center, center, size * 0.45, Math.PI/8, Math.PI/4, false);
+            ctx.stroke();
+        }
+
+        function downloadCanvas(filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.textContent = `Download ${filename}`;
+            link.style.display = 'block';
+            link.style.margin = '5px 0';
+            downloads.appendChild(link);
+        }
+
+        // Generate all icon sizes
+        const sizes = [
+            {size: 16, stroke: 1, filename: 'icon16.png'},
+            {size: 32, stroke: 2, filename: 'icon32.png'},
+            {size: 48, stroke: 2, filename: 'icon48.png'},
+            {size: 128, stroke: 4, filename: 'icon128.png'}
+        ];
+
+        sizes.forEach((config, index) => {
+            setTimeout(() => {
+                drawMicrophoneIcon(config.size, config.stroke);
+                downloadCanvas(config.filename);
+            }, index * 100);
+        });
+
+        // Auto-download function (for programmatic use)
+        function autoDownloadAll() {
+            sizes.forEach((config, index) => {
+                setTimeout(() => {
+                    drawMicrophoneIcon(config.size, config.stroke);
+                    
+                    // Convert to blob and create file
+                    canvas.toBlob((blob) => {
+                        const reader = new FileReader();
+                        reader.onload = function() {
+                            // This would need server-side handling to actually save files
+                            console.log(`Generated ${config.filename}`);
+                        };
+                        reader.readAsDataURL(blob);
+                    }, 'image/png');
+                }, index * 100);
+            });
+        }
+
+        // Display instructions
+        const instructions = document.createElement('div');
+        instructions.innerHTML = `
+            <h3>Recording Icons Generated</h3>
+            <p>Click the download links below to save each icon:</p>
+        `;
+        document.body.insertBefore(instructions, downloads);
+    </script>
+</body>
+</html>
