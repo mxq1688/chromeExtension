@@ -17,6 +17,10 @@ if (window.webToolboxLoaded) {
         
         try {
             switch (request.action) {
+                case 'ping':
+                    sendResponse({ status: 'pong', timestamp: Date.now() });
+                    break;
+                    
                 case 'getPageStats':
                     const stats = getPageStats();
                     console.log('Page stats:', stats);
@@ -39,6 +43,7 @@ if (window.webToolboxLoaded) {
                     break;
                     
                 default:
+                    console.warn('Unknown action:', request.action);
                     sendResponse({ error: 'Unknown action: ' + request.action });
             }
         } catch (error) {
