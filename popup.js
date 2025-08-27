@@ -1,181 +1,134 @@
-// popup.js - 弹窗界面逻辑
+// popup.js - 简化版弹窗逻辑
 
 console.log('🛠️ Popup script loaded');
 
-// DOM元素
-const elements = {
-    loading: document.getElementById('loading'),
-    pageInfo: document.getElementById('page-info'),
-    pageStats: document.getElementById('page-stats'),
-    tools: document.getElementById('tools'),
-    status: document.getElementById('status'),
-    
-    // 页面信息元素
-    pageTitle: document.getElementById('page-title'),
-    pageUrl: document.getElementById('page-url'),
-    pageDomain: document.getElementById('page-domain'),
-    
-    // 统计信息元素
-    imageCount: document.getElementById('image-count'),
-    linkCount: document.getElementById('link-count'),
-    scriptCount: document.getElementById('script-count'),
-    
-    // 工具按钮
-    scrollTop: document.getElementById('scroll-top'),
-    highlightLinks: document.getElementById('highlight-links'),
-    copyUrl: document.getElementById('copy-url'),
-    showImages: document.getElementById('show-images')
-};
-
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
+// 等待DOM加载完成
+document.addEventListener('DOMContentLoaded', async () => {
     console.log('Popup DOM loaded');
-    initializePopup();
+    
+    try {
+        await initializePopup();
+    } catch (error) {
+        console.error('Initialize error:', error);
+        showError('初始化失败: ' + error.message);
+    }
 });
 
 // 初始化弹窗
 async function initializePopup() {
+    // 显示加载状态
+    showLoading();
+    
     try {
-        // 显示加载状态
-        showLoading();
+        // 获取当前标签页
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
         
-        // 获取当前活动标签页
-        const tabs = await getCurrentTab();
         if (!tabs || !tabs[0]) {
-            showError('无法获取当前标签页');
-            return;
+            throw new Error('无法获取当前标签页');
         }
         
         const currentTab = tabs[0];
-        console.log('Current tab:', currentTab);
+        console.log('Current tab:', currentTab.url);
         
-        // 检查是否是支持的页面
-        if (!isSupportedUrl(currentTab.url)) {
+        // 检查URL是否支持
+        if (!currentTab.url.startsWith('http')) {
             showError('当前页面不支持该功能\n(chrome:// 页面或本地文件)');
             return;
         }
         
-        // 从当前标签页获取页面信息
-        await loadPageData(currentTab);
+        // 显示基本页面信息
+        document.getElementById('page-title').textContent = currentTab.title || '未知标题';
+        document.getElementById('page-url').textContent = currentTab.url;
         
-        // 设置工具按钮事件
-        setupToolEvents(currentTab.id);
+        // 解析域名
+        try {
+            const urlObj = new URL(currentTab.url);
+            document.getElementById('page-domain').textContent = urlObj.hostname;
+        } catch (e) {
+            document.getElementById('page-domain').textContent = '解析失败';
+        }
+        
+        // 尝试获取页面统计信息
+        try {
+            const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getPageStats' });
+            
+            if (response && !response.error) {
+                document.getElementById('image-count').textContent = response.images || '0';
+                document.getElementById('link-count').textContent = response.links || '0';
+                document.getElementById('script-count').textContent = response.scripts || '0';
+            } else {
+                throw new Error('无法获取统计信息');
+            }
+        } catch (error) {
+            console.warn('Get stats error:', error);
+            document.getElementById('image-count').textContent = '获取失败';
+            document.getElementById('link-count').textContent = '获取失败';
+            document.getElementById('script-count').textContent = '获取失败';
+        }
+        
+        // 设置按钮事件
+        setupButtons(currentTab.id);
         
         // 显示内容
         showContent();
         
     } catch (error) {
-        console.error('Initialize error:', error);
-        showError('初始化失败: ' + error.message);
+        console.error('Load error:', error);
+        showError('加载失败: ' + error.message);
     }
 }
 
-// 获取当前标签页
-function getCurrentTab() {
-    return new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-            } else {
-                resolve(tabs);
-            }
-        });
-    });
-}
-
-// 检查URL是否支持
-function isSupportedUrl(url) {
-    if (!url) return false;
-    return url.startsWith('http://') || url.startsWith('https://');
-}
-
-// 加载页面数据
-async function loadPageData(tab) {
-    try {
-        // 基本页面信息（从tab对象获取）
-        elements.pageTitle.textContent = tab.title || '未知标题';
-        elements.pageUrl.textContent = tab.url || '未知URL';
-        
-        // 解析域名
-        try {
-            const urlObj = new URL(tab.url);
-            elements.pageDomain.textContent = urlObj.hostname;
-        } catch (e) {
-            elements.pageDomain.textContent = '解析失败';
-        }
-        
-        // 向content script请求页面统计信息
-        const stats = await sendMessageToTab(tab.id, { action: 'getPageStats' });
-        
-        if (stats && !stats.error) {
-            elements.imageCount.textContent = stats.images || '0';
-            elements.linkCount.textContent = stats.links || '0';
-            elements.scriptCount.textContent = stats.scripts || '0';
-        } else {
-            // 如果无法获取统计信息，显示默认值
-            elements.imageCount.textContent = '计算中...';
-            elements.linkCount.textContent = '计算中...';
-            elements.scriptCount.textContent = '计算中...';
-        }
-        
-    } catch (error) {
-        console.error('Load page data error:', error);
-        // 显示基本信息，统计信息显示错误状态
-        elements.imageCount.textContent = '获取失败';
-        elements.linkCount.textContent = '获取失败';
-        elements.scriptCount.textContent = '获取失败';
-    }
-}
-
-// 向标签页发送消息
-function sendMessageToTab(tabId, message) {
-    return new Promise((resolve) => {
-        chrome.tabs.sendMessage(tabId, message, (response) => {
-            if (chrome.runtime.lastError) {
-                console.warn('Message send error:', chrome.runtime.lastError.message);
-                resolve({ error: chrome.runtime.lastError.message });
-            } else {
-                resolve(response || { error: 'No response' });
-            }
-        });
-    });
-}
-
-// 设置工具按钮事件
-function setupToolEvents(tabId) {
+// 设置按钮事件
+function setupButtons(tabId) {
     // 回到顶部
-    elements.scrollTop.addEventListener('click', async () => {
-        const result = await sendMessageToTab(tabId, { action: 'scrollToTop' });
-        showStatus(result.error ? '操作失败' : '已回到页面顶部', !result.error);
+    document.getElementById('scroll-top').addEventListener('click', async () => {
+        try {
+            await chrome.tabs.sendMessage(tabId, { action: 'scrollToTop' });
+            showStatus('已回到页面顶部', true);
+        } catch (error) {
+            console.error('Scroll error:', error);
+            showStatus('操作失败', false);
+        }
     });
     
     // 高亮链接
-    elements.highlightLinks.addEventListener('click', async () => {
-        const result = await sendMessageToTab(tabId, { action: 'highlightLinks' });
-        showStatus(result.error ? '操作失败' : '链接高亮已切换', !result.error);
+    document.getElementById('highlight-links').addEventListener('click', async () => {
+        try {
+            const response = await chrome.tabs.sendMessage(tabId, { action: 'highlightLinks' });
+            showStatus('链接高亮已切换', true);
+        } catch (error) {
+            console.error('Highlight error:', error);
+            showStatus('操作失败', false);
+        }
     });
     
     // 复制URL
-    elements.copyUrl.addEventListener('click', async () => {
+    document.getElementById('copy-url').addEventListener('click', async () => {
         try {
-            const tabs = await getCurrentTab();
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             if (tabs && tabs[0]) {
                 await navigator.clipboard.writeText(tabs[0].url);
                 showStatus('URL已复制到剪贴板', true);
             }
         } catch (error) {
-            console.error('Copy URL error:', error);
+            console.error('Copy error:', error);
             showStatus('复制失败', false);
         }
     });
     
     // 显示图片信息
-    elements.showImages.addEventListener('click', async () => {
-        const result = await sendMessageToTab(tabId, { action: 'getImageInfo' });
-        if (result.error) {
+    document.getElementById('show-images').addEventListener('click', async () => {
+        try {
+            const response = await chrome.tabs.sendMessage(tabId, { action: 'getImageInfo' });
+            
+            if (response && response.images) {
+                showImageInfo(response.images);
+            } else {
+                showStatus('没有找到图片信息', false);
+            }
+        } catch (error) {
+            console.error('Get images error:', error);
             showStatus('获取图片信息失败', false);
-        } else {
-            showImageInfo(result.images || []);
         }
     });
 }
@@ -189,19 +142,18 @@ function showImageInfo(images) {
     
     let info = `页面共有 ${images.length} 张图片:\n\n`;
     
-    // 显示前10张图片信息
-    const displayCount = Math.min(images.length, 10);
+    const displayCount = Math.min(images.length, 5);
     for (let i = 0; i < displayCount; i++) {
         const img = images[i];
-        info += `${i + 1}. ${img.src || '无源地址'}\n`;
+        info += `${i + 1}. ${img.src ? img.src.substring(0, 50) + '...' : '无源地址'}\n`;
         if (img.width && img.height) {
             info += `   尺寸: ${img.width} x ${img.height}\n`;
         }
-        info += `   Alt: ${img.alt || '无描述'}\n\n`;
+        info += `\n`;
     }
     
-    if (images.length > 10) {
-        info += `... 还有 ${images.length - 10} 张图片`;
+    if (images.length > 5) {
+        info += `... 还有 ${images.length - 5} 张图片`;
     }
     
     alert(info);
@@ -209,43 +161,45 @@ function showImageInfo(images) {
 
 // 显示加载状态
 function showLoading() {
-    elements.loading.style.display = 'block';
-    elements.pageInfo.style.display = 'none';
-    elements.pageStats.style.display = 'none';
-    elements.tools.style.display = 'none';
-    elements.status.style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('page-info').style.display = 'none';
+    document.getElementById('page-stats').style.display = 'none';
+    document.getElementById('tools').style.display = 'none';
+    document.getElementById('status').style.display = 'none';
 }
 
 // 显示内容
 function showContent() {
-    elements.loading.style.display = 'none';
-    elements.pageInfo.style.display = 'block';
-    elements.pageStats.style.display = 'block';
-    elements.tools.style.display = 'block';
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('page-info').style.display = 'block';
+    document.getElementById('page-stats').style.display = 'block';
+    document.getElementById('tools').style.display = 'block';
 }
 
 // 显示错误
 function showError(message) {
-    elements.loading.style.display = 'none';
-    elements.pageInfo.style.display = 'none';
-    elements.pageStats.style.display = 'none';
-    elements.tools.style.display = 'none';
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('page-info').style.display = 'none';
+    document.getElementById('page-stats').style.display = 'none';
+    document.getElementById('tools').style.display = 'none';
     
-    elements.status.textContent = message;
-    elements.status.className = 'status error';
-    elements.status.style.display = 'block';
+    const statusEl = document.getElementById('status');
+    statusEl.textContent = message;
+    statusEl.className = 'status error';
+    statusEl.style.display = 'block';
 }
 
 // 显示状态消息
 function showStatus(message, isSuccess) {
-    elements.status.textContent = message;
-    elements.status.className = `status ${isSuccess ? 'success' : 'error'}`;
-    elements.status.style.display = 'block';
+    const statusEl = document.getElementById('status');
+    statusEl.textContent = message;
+    statusEl.className = `status ${isSuccess ? 'success' : 'error'}`;
+    statusEl.style.display = 'block';
     
     // 3秒后隐藏
     setTimeout(() => {
-        elements.status.style.display = 'none';
+        statusEl.style.display = 'none';
     }, 3000);
 }
 
-console.log('🎉 Popup script initialized');
+console.log('🎉 Popup script ready');
