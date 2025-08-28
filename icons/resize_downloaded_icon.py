@@ -13,7 +13,7 @@ def resize_professional_icon():
     将下载的专业图标调整为Chrome扩展需要的尺寸
     """
     # 输入文件
-    input_file = "temp_icon.png"
+    input_file = "toolbox_temp.png"
     
     if not os.path.exists(input_file):
         print(f"❌ 找不到文件: {input_file}")
