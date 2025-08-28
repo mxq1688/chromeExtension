@@ -284,7 +284,12 @@ function showImageInfo(images) {
 // UI状态管理函数
 function showLoading(message = '正在加载...') {
     elements.loading.style.display = 'block';
-    elements.loading.querySelector('div:last-child').textContent = message;
+    
+    // 更新loading消息 - 修复：直接设置HTML内容
+    elements.loading.innerHTML = `
+        <div class="spinner"></div>
+        ${message}
+    `;
     
     elements.pageInfo.style.display = 'none';
     elements.pageStats.style.display = 'none';
