@@ -82,6 +82,7 @@ function cacheElements() {
     elements.highlightLinksBtn = document.getElementById('highlight-links');
     elements.copyUrlBtn = document.getElementById('copy-url');
     elements.showImagesBtn = document.getElementById('show-images');
+    elements.showSidebarBtn = document.getElementById('show-sidebar');
 }
 
 // 获取当前标签页
@@ -198,6 +199,21 @@ function setupEventListeners() {
         } catch (error) {
             console.error('获取图片信息失败:', error);
             showStatus('❌ 获取图片信息失败: ' + error.message, 'error');
+        }
+    });
+    
+    // 显示侧边栏
+    elements.showSidebarBtn?.addEventListener('click', async () => {
+        try {
+            const result = await sendMessageToTab({ action: 'showSidebar' });
+            if (result && result.success) {
+                showStatus('📱 侧边栏已显示', 'success');
+            } else {
+                showStatus('❌ 显示侧边栏失败', 'error');
+            }
+        } catch (error) {
+            console.error('显示侧边栏失败:', error);
+            showStatus('❌ 显示侧边栏失败: ' + error.message, 'error');
         }
     });
     

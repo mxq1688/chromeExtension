@@ -94,6 +94,10 @@ function handleMessage(request, sender, sendResponse) {
                 result = getImageInformation();
                 break;
                 
+            case 'showSidebar':
+                result = toggleSidebar();
+                break;
+                
             default:
                 console.warn('⚠️ Unknown action:', request.action);
                 result = { error: `未知操作: ${request.action}` };
@@ -286,5 +290,185 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
     console.error('🚨 Content script unhandled rejection:', event.reason);
 });
+
+// 侧边栏功能
+function toggleSidebar() {
+    try {
+        const sidebarId = 'webtoolbox-sidebar';
+        let sidebar = document.getElementById(sidebarId);
+        
+        if (sidebar) {
+            // 如果侧边栏已存在，切换显示/隐藏
+            if (sidebar.style.display === 'none') {
+                sidebar.style.display = 'block';
+                console.log('✅ Sidebar shown');
+                return { success: true, action: 'shown' };
+            } else {
+                sidebar.style.display = 'none';
+                console.log('✅ Sidebar hidden');
+                return { success: true, action: 'hidden' };
+            }
+        } else {
+            // 创建新的侧边栏
+            sidebar = createSidebar();
+            document.body.appendChild(sidebar);
+            console.log('✅ Sidebar created and shown');
+            return { success: true, action: 'created' };
+        }
+        
+    } catch (error) {
+        console.error('❌ Sidebar toggle error:', error);
+        return { error: error.message };
+    }
+}
+
+function createSidebar() {
+    const sidebar = document.createElement('div');
+    sidebar.id = 'webtoolbox-sidebar';
+    sidebar.innerHTML = `
+        <div class="webtoolbox-sidebar-header">
+            <h3>🛠️ 网页工具箱</h3>
+            <button class="webtoolbox-sidebar-close" onclick="document.getElementById('webtoolbox-sidebar').style.display='none'">×</button>
+        </div>
+        <div class="webtoolbox-sidebar-content">
+            <div class="webtoolbox-sidebar-section">
+                <h4>📄 页面信息</h4>
+                <p><strong>标题:</strong> ${document.title}</p>
+                <p><strong>URL:</strong> ${window.location.href}</p>
+                <p><strong>域名:</strong> ${window.location.hostname}</p>
+            </div>
+            
+            <div class="webtoolbox-sidebar-section">
+                <h4>📊 页面统计</h4>
+                <p>图片: ${document.querySelectorAll('img').length} 个</p>
+                <p>链接: ${document.querySelectorAll('a[href]').length} 个</p>
+                <p>脚本: ${document.querySelectorAll('script').length} 个</p>
+            </div>
+            
+            <div class="webtoolbox-sidebar-section">
+                <h4>🔧 快捷工具</h4>
+                <button class="webtoolbox-sidebar-btn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">回到顶部</button>
+                <button class="webtoolbox-sidebar-btn" onclick="navigator.clipboard.writeText(window.location.href).then(() => alert('URL已复制!'))">复制URL</button>
+                <button class="webtoolbox-sidebar-btn" onclick="window.print()">打印页面</button>
+            </div>
+        </div>
+    `;
+    
+    // 添加样式
+    const style = document.createElement('style');
+    style.textContent = `
+        #webtoolbox-sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 320px;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            z-index: 999999;
+            overflow-y: auto;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.3);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .webtoolbox-sidebar-header {
+            background: rgba(0,0,0,0.2);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .webtoolbox-sidebar-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .webtoolbox-sidebar-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        
+        .webtoolbox-sidebar-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .webtoolbox-sidebar-content {
+            padding: 20px;
+        }
+        
+        .webtoolbox-sidebar-section {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .webtoolbox-sidebar-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .webtoolbox-sidebar-section h4 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+        
+        .webtoolbox-sidebar-section p {
+            margin: 8px 0;
+            font-size: 13px;
+            opacity: 0.8;
+            word-break: break-all;
+        }
+        
+        .webtoolbox-sidebar-btn {
+            display: block;
+            width: 100%;
+            padding: 10px 15px;
+            margin: 8px 0;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .webtoolbox-sidebar-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+        }
+        
+        .webtoolbox-sidebar-btn:active {
+            transform: translateY(0);
+        }
+    `;
+    
+    // 将样式添加到head
+    if (!document.getElementById('webtoolbox-sidebar-styles')) {
+        style.id = 'webtoolbox-sidebar-styles';
+        document.head.appendChild(style);
+    }
+    
+    return sidebar;
+}
 
 console.log('🎉 [网页工具箱] Content script ready and waiting for messages');
